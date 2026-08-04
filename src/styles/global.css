@@ -625,3 +625,118 @@ html { scroll-behavior: smooth; }
   .prompt-list { flex-direction: column; }
   .prompt-card { width: 100%; }
 }
+
+/* 저장/인쇄 안내 문구 */
+.save-guide {
+  text-align: center;
+  font-size: 0.85em;
+  color: #777;
+  margin: 0.5rem 0 1.5rem;
+  line-height: 1.5;
+}
+.save-guide strong {
+  color: #555;
+}
+
+/* 사용법 가이드 */
+.how-to-use {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e0ddd5;
+}
+.how-title {
+  text-align: center;
+  color: #4a5530;
+  font-size: 1.15em;
+  margin-bottom: 1.2rem;
+}
+.how-steps {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+.how-step {
+  flex: 1;
+  min-width: 120px;
+  max-width: 160px;
+  text-align: center;
+  padding: 0.5rem;
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #4a5530;
+  color: #fff;
+  font-size: 0.75em;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+.step-icon {
+  font-size: 1.8em;
+  margin-bottom: 0.3rem;
+}
+.how-step h4 {
+  font-size: 0.95em;
+  color: #333;
+  margin-bottom: 0.2rem;
+}
+.how-step p {
+  font-size: 0.8em;
+  color: #777;
+  line-height: 1.4;
+}
+.how-arrow {
+  display: flex;
+  align-items: center;
+  font-size: 1.3em;
+  color: #bbb;
+  padding-top: 2.5rem;
+}
+@media (max-width: 600px) {
+  .how-steps {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .how-step {
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    text-align: left;
+    padding: 0.6rem 0;
+  }
+  .step-icon { font-size: 1.5em; flex-shrink: 0; }
+  .how-arrow {
+    transform: rotate(90deg);
+    padding: 0;
+    font-size: 1em;
+  }
+}
+
+/* 이용 안내 (Detail 실용 정보) */
+.practical-info {
+  background: #f8f7f3;
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin: 1rem 0;
+  border-left: 3px solid #4a5530;
+}
+.practical-info h3 {
+  font-size: 1em;
+  color: #4a5530;
+  margin-bottom: 0.5rem;
+}
+.practical-info p {
+  font-size: 0.9em;
+  color: #555;
+  line-height: 1.6;
+}
