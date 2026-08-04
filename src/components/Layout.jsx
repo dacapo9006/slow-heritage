@@ -13,7 +13,7 @@ export default function Layout() {
           <Link to="/" className="logo">
             <img src="https://onaitourism.com/images/logo-full.png" alt="On AI Tourism Lab" className="logo-img" />
             <div>
-              <h1>슬로-헤리티지</h1>
+              <h1>슬로-헤리티지(Slow-Heritage)</h1>
               <span className="logo-sub">아이와 함께 걷는 한적한 역사·문화여행</span>
             </div>
           </Link>
