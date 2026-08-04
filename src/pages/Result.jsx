@@ -290,10 +290,11 @@ export default function Result() {
       {/* 코스 저장 + 인쇄 */}
       <div className="result-actions">
         <button className={`btn-save ${saved ? 'saved' : ''}`} onClick={handleSaveCourse} disabled={saved || course.length === 0}>
-          {saved ? '✅ 저장됨' : '💾 이 코스 저장하기'}
+          {saved ? "✅ 저장됨" : "💾 이 코스 저장하기"}
         </button>
         <button className="btn-print no-print" onClick={() => window.print()}>🖨️ 인쇄</button>
       </div>
+      <p className="save-guide no-print">💡 저장된 코스는 상단 <strong>📋 저장코스</strong>에서 다시 볼 수 있어요 (이 브라우저에 최대 10개 보관). 인쇄 버튼을 누르면 코스 전체를 PDF로 저장하거나 출력할 수 있습니다.</p>
 
       {course.length === 0 ? (
         <p className="no-result">조건에 맞는 관광지를 찾지 못했습니다. 다른 지역이나 관심분야를 선택해보세요.</p>
