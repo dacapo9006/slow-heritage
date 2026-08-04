@@ -27,6 +27,31 @@ const INTEREST_KEYWORDS = {
   '서원·향교': '서원', '박물관': '박물관', '전통마을': '전통마을', '근현대역사': '근대역사',
 };
 
+/** 부적합 장소 필터링 */
+const BLOCKED_IDS = new Set([
+  '3452166',  // 커넥트현대 (백화점)
+  '2822910',  // 창비부산 (폐업)
+]);
+
+const EXCLUDED_KEYWORDS = [
+  '백화점', '쇼핑몰', '마트', '아울렛', '면세점', '할인매장',
+  '모텔', '호텔', '리조트', '펜션', '게스트하우스',
+  '식당', '카페', '맛집', '레스토랑', '베이커리', '치킨',
+  '노래방', '볼링장', '오락실', 'PC방', '찜질방', '사우나',
+  '병원', '의원', '치과', '약국', '한의원',
+  '학원', '어린이집', '유치원',
+  '부동산', '공인중개', '세탁소', '미용실',
+];
+
+function isHeritageSuitable(item) {
+  if (BLOCKED_IDS.has(item.contentid)) return false;
+  const title = item.title || '';
+  if (EXCLUDED_KEYWORDS.some(kw => title.includes(kw))) return false;
+  return true;
+}
+
+
+
 /** 교육과정 연계 데이터 (2022 개정) */
 const CURRICULUM_MAP = {
   '궁궐': { grade: '초등 5~6 / 중학교', code: '[6사05-01] [9역06-01]', desc: '조선의 정치와 왕실 문화, 조선 건국과 통치 체제' },
@@ -195,7 +220,7 @@ export default function Result() {
         for (const item of culture) {
           if (!seen3.has(item.contentid)) items.push(item);
         }
-        items = items.filter(i => i.firstimage && i.mapx && i.mapy);
+        items = items.filter(i => i.firstimage && i.mapx && i.mapy && isHeritageSuitable(i));
         if (items.length > maxStops) {
           items = sortByRoute(items).slice(0, maxStops);
         } else {
