@@ -11,10 +11,10 @@ export default function Layout() {
       <header className="app-header">
         <div className="header-row">
           <Link to="/" className="logo">
-            <span className="logo-icon">🏛️</span>
+            <img src="https://onaitourism.com/images/logo-full.png" alt="On AI Tourism Lab" className="logo-img" />
             <div>
-              <h1>슬로 헤리티지</h1>
-              <span className="logo-sub">아이와 걷는 한적한 역사여행</span>
+              <h1>슬로-헤리티지</h1>
+              <span className="logo-sub">아이와 함께 걷는 한적한 역사·문화여행</span>
             </div>
           </Link>
           <div className="header-right">
@@ -30,7 +30,7 @@ export default function Layout() {
       <footer className="app-footer">
         <p>출처: ⓒ한국관광공사 | 2026 관광데이터 활용 공모전</p>
         <div className="footer-brand">
-          <span className="footer-lab">On AI Tourism Lab™</span>
+          <span className="footer-lab">On AI Tourism Lab™(상표출원 중)</span>
         </div>
       </footer>
     </div>
