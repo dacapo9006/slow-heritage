@@ -68,6 +68,7 @@ body {
   color: var(--text-light);
 }
 .logo-icon { font-size: 1.5rem; }
+.logo-img { height: 38px; width: auto; border-radius: 6px; }
 
 /* Main */
 .app-main {
