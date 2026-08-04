@@ -25,7 +25,8 @@ const AGE_GROUPS = [
   { value: 'baby', label: '0~2세 (유아)', desc: '유모차 필수, 짧은 코스' },
   { value: 'toddler', label: '3~5세 (걸음마)', desc: '30분 이내 도보, 체험 중심' },
   { value: 'child', label: '6~9세 (초등저)', desc: '역사교육, 미션 가능' },
-  { value: 'upper', label: '10~13세 (초등고)', desc: '점토 역사 설명, 긴 코스 OK' },
+  { value: 'upper', label: '10~13세 (초등고)', desc: '깊이 있는 역사 해설, 긴 코스 OK' },
+  { value: 'middle', label: '14~15세 (중학생)', desc: '자율 탐구형, 교과 연계 심화' },
 ];
 
 const COURSE_TYPES = [
