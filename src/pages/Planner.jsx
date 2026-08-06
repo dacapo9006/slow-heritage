@@ -139,6 +139,7 @@ export default function Planner() {
         >
           AI 코스 추천받기
         </button>
+        <p style={{fontSize:'13px',color:'#888',textAlign:'center',marginTop:'8px'}}>💡 추천 결과에서 장소를 추가/제거하고 순서도 변경할 수 있어요</p>
       </form>
     </div>
   );
