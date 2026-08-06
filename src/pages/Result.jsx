@@ -55,13 +55,15 @@ const EXCLUDED_KEYWORDS = [
   // 의료
   '병원', '의원', '치과', '약국', '한의원',
   // 교육·돌봄
-  '학원', '어린이집', '유치원',
+  '학원', '어린이짐', '유치원',
   // 생활·서비스
   '부동산', '공인중개', '세탁소', '미용실', '마사지', '에스테틱',
   // 사업체·법인
   '협동조합', '주식회사', '영농조합', '법인', '상회',
   // 산업·교통
   '공장', '제조', '산업단지', '물류센터', '주유소', '정비소', '렌터카', '터미널', '휴게소', '주차장',
+  // 공연·비역사 시설
+  '카드홀', '씨어터', '콘서트홀', '공연장',
 ];
 
 function isHeritageSuitable(item) {
@@ -106,7 +108,7 @@ const SAFETY_CHECKLISTS = {
     '비상약(반창고, 해열제 등)을 챙겼나요?',
   ],
   child: [
-    '편한 운동화를 싣었나요?',
+    '편한 운동화를 신었나요?',
     '물·간식·우산 등 기본 준비물을 확인했나요?',
     '문화재는 만지거나 올라타지 않기로 약속했나요?',
     '사진 촬영 금지 구역을 함께 확인하세요.',
@@ -117,7 +119,7 @@ const SAFETY_CHECKLISTS = {
     '충분한 물과 간식을 챙겼나요?',
     '문화재 보호 규칙을 함께 읽어보았나요?',
     '사전 학습 자료(역사 배경)를 준비했나요?',
-    '사진·메모 도구를 챙겼나요?',
+    '사진·메모 돀구를 챙겼나요?',
     '날씨에 맞는 복장을 준비했나요?',
     '비상 연락처를 아이도 알고 있나요?',
   ],
@@ -288,7 +290,7 @@ export default function Result() {
     return (
       <div className="loading">
         <div className="loading-spinner"></div>
-        <p>AI가 맟촤 코스를 만들고 있습니다...</p>
+        <p>AI가 맞춤 코스를 만들고 있습니다...</p>
         <p className="loading-sub">
           {childAge === 'baby' ? '유모차 경로를 확인하는 중' :
            childAge === 'toddler' ? '짧은 거리 위주로 선별 중' :
@@ -304,7 +306,7 @@ export default function Result() {
     <div className="result" id="printable-result">
       <button className="btn-back" onClick={() => navigate(-1)}>← 다시 설정</button>
 
-      <h2>{courseType === 'full' ? '하루' : '반나절'} 역사여행 코스</h2>
+      <h2>{courseType === 'full' ? '하루' : '반나절'} 역사엨행 코스</h2>
       <p className="result-meta">
         {AREA_NAMES[region]} · {AGE_LABELS[childAge]}
         {interests.length > 0 && ` · ${interests.join(', ')}`}
@@ -363,7 +365,7 @@ export default function Result() {
                 <div className="course-travel">
                   <div className="travel-line" />
                   <span className="travel-info">
-                    🚶 도보 {segments[idx-1].walk}분 ({segments[idx-1].dist < 1 ? `${Math.round(segments[idx-1].dist*1000)}m` : `${segments[idx-1].dist.toFixed(1)}km`})
+                    {idx}번 → {idx+1}번: 🚶 도보 {segments[idx-1].walk}분 ({segments[idx-1].dist < 1 ? `${Math.round(segments[idx-1].dist*1000)}m` : `${segments[idx-1].dist.toFixed(1)}km`})
                     {segments[idx-1].dist > 3 && ' · 🚗 차량 이동 추천'}
                   </span>
                 </div>
@@ -384,7 +386,7 @@ export default function Result() {
 
       {course.length > 0 && <SafetyChecklist childAge={childAge} />}
 
-      <p className="data-source">출처: ⓒ한국톀광공사</p>
+      <p className="data-source">출처: ⓒ한국관광공사</p>
     </div>
   );
 }
