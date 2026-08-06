@@ -19,20 +19,22 @@ async function callTourApi(operation, params = {}) {
   return data.response?.body?.items?.item || [];
 }
 
-export async function searchKeyword(keyword, contentTypeId, areaCode, pageNo = 1, numOfRows = 10) {
+export async function searchKeyword(keyword, contentTypeId, areaCode, pageNo = 1, numOfRows = 10, cat1 = '') {
   return callTourApi('searchKeyword2', {
     keyword,
     ...(contentTypeId && { contentTypeId }),
     ...(areaCode && { areaCode }),
+    ...(cat1 && { cat1 }),
     pageNo, numOfRows,
   });
 }
 
-export async function areaBasedList(areaCode, sigunguCode, contentTypeId, pageNo = 1, numOfRows = 10) {
+export async function areaBasedList(areaCode, sigunguCode, contentTypeId, pageNo = 1, numOfRows = 10, cat1 = '') {
   return callTourApi('areaBasedList2', {
     areaCode,
     ...(sigunguCode && { sigunguCode }),
     ...(contentTypeId && { contentTypeId }),
+    ...(cat1 && { cat1 }),
     pageNo, numOfRows, arrange: 'R',
   });
 }
@@ -70,3 +72,7 @@ export const CONTENT_TYPES = {
   여행코스: '25', 레포츠: '28', 숙박: '32',
   쇼핑: '38', 음식점: '39',
 };
+
+export async function detailImage(contentId) {
+  return callTourApi('detailImage2', { contentId, numOfRows: 10 });
+}
