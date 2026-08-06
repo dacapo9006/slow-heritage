@@ -19,13 +19,22 @@ const AGE_CONFIG = {
   toddler: { maxStops: 3, maxWalk: 25, tip: '30분 이내 도보 거리를 추천합니다. 쉴 곳이 있는지 확인하세요.' },
   child:   { maxStops: 4, maxWalk: 40, tip: '역사 퀴즈와 미션으로 아이의 흥미를 유지하세요!' },
   upper:   { maxStops: 5, maxWalk: 60, tip: '깊이 있는 역사 해설을 함께 읽어보면 좋습니다.' },
-  middle:  { maxStops: 6, maxWalk: 90, tip: '자율 탐구형 코스: 교과서에서 배운 엮사를 현장에서 확인해보세요!' },
+  middle:  { maxStops: 6, maxWalk: 90, tip: '자율 탐구형 코스: 교과서에서 배운 역사를 현장에서 확인해보세요!' },
 };
 
-const INTEREST_KEYWORDS = {
-  '궁궐': '궁궐', '사찰': '사찰', '성곽': '성곽', '고분': '고분',
-  '서원·향교': '서원', '박물관': '박물관', '전통마을': '전통마을', '근현대역사': '근대역사',
+const INTEREST_CONFIG = {
+  '궁궐':      { keyword: '궁궐',     typeId: '12', cat3: ['A02010100'] },
+  '사찰':      { keyword: '사찰',     typeId: '12', cat3: ['A02010800'] },
+  '성곽':      { keyword: '성곽',     typeId: '12', cat3: ['A02010200', 'A02010700'] },
+  '고분':      { keyword: '고분',     typeId: '12', cat3: ['A02010700'] },
+  '서원·향교': { keyword: '서원',     typeId: '12', cat3: ['A02010700'] },
+  '박물관':    { keyword: '박물관',   typeId: '14', cat3: ['A02060100', 'A02060200', 'A02060300'] },
+  '전통마을':  { keyword: '전통마을', typeId: '12', cat3: ['A02010600'] },
+  '근현대역사': { keyword: '근대역사', typeId: '12', cat3: ['A02010700', 'A02011000'] },
 };
+
+/** 역사·문화 관련 cat2만 허용 (A0201=역사관광지, A0206=문화시설) */
+const HERITAGE_CAT2 = new Set(['A0201', 'A0206']);
 
 /** 부적합 장소 필터링 */
 const BLOCKED_IDS = new Set([
@@ -34,18 +43,18 @@ const BLOCKED_IDS = new Set([
 ]);
 
 const EXCLUDED_KEYWORDS = [
-  // 쇸핑·상업
+  // 쇼핑·상업
   '백화점', '쇼핑몰', '마트', '아울렛', '면세점', '할인매장', '대리점',
   // 숙박
-  '모핔', '호텔', '리조트', '펜션', '게스트하우스', '민박', '콘도',
+  '모텔', '호텔', '리조트', '펜션', '게스트하우스', '민박', '콘도',
   // 음식
   '식당', '카페', '맛집', '레스토랑', '베이커리', '치킨', '횟집', '고깃집', '분식', '피자',
-  // 오띭·레저',
-  '노래방', '볼릁핝', '오락실', 'PC방', '찜질방', '사우나',
-  '워터파크', '녀이공원', '테마파크', 'ꨗ프', '스키장', '승을', '낚시터', '수상레저', '캠핑장', '글래핑',
+  // 오락·레저
+  '노래방', '볼링장', '오락실', 'PC방', '찜질방', '사우나',
+  '워터파크', '놀이공원', '테마파크', '골프', '스키장', '승마', '낚시터', '수상레저', '캠핑장', '글램핑',
   // 의료
-  '병원', '의원', '치과', '약浭', '한의원',
-  // 교육ⷷ돌봴
+  '병원', '의원', '치과', '약국', '한의원',
+  // 교육·돌봄
   '학원', '어린이집', '유치원',
   // 생활·서비스
   '부동산', '공인중개', '세탁소', '미용실', '마사지', '에스테틱',
@@ -59,6 +68,8 @@ function isHeritageSuitable(item) {
   if (BLOCKED_IDS.has(item.contentid)) return false;
   const title = item.title || '';
   if (EXCLUDED_KEYWORDS.some(kw => title.includes(kw))) return false;
+  // cat2 카테고리 필터: 역사관광지(A0201) 또는 문화시설(A0206)만 허용
+  if (item.cat2 && !HERITAGE_CAT2.has(item.cat2)) return false;
   return true;
 }
 
@@ -95,10 +106,10 @@ const SAFETY_CHECKLISTS = {
     '비상약(반창고, 해열제 등)을 챙겼나요?',
   ],
   child: [
-    '편한 운동화를 신었나요?',
+    '편한 운동화를 싣었나요?',
     '물·간식·우산 등 기본 준비물을 확인했나요?',
-    '뮸화재는 만지거나 욬라타지 않기로 약속했나요?',
-    '사진 촜영 금지 구역을 함께 확인하세요.',
+    '문화재는 만지거나 올라타지 않기로 약속했나요?',
+    '사진 촬영 금지 구역을 함께 확인하세요.',
     '미션 수첩이나 메모장을 준비하면 좋아요!',
     '자외선 차단 + 모자를 잊지 마세요.',
   ],
@@ -179,7 +190,7 @@ function SafetyChecklist({ childAge }) {
           </label>
         ))}
       </div>
-      {allChecked && <div className="safety-complete">✅ 모든 준비가 완료되었습니다! 즈거운 여행 되세요!</div>}
+      {allChecked && <div className="safety-complete">✅ 모든 준비가 완료되었습니다! 즐거운 여행 되세요!</div>}
     </div>
   );
 }
@@ -209,9 +220,10 @@ export default function Result() {
       try {
         let items = [];
         if (interests.length > 0) {
-          const searches = interests.map(i =>
-            searchKeyword(INTEREST_KEYWORDS[i] || i, '12', region, 1, 15)
-          );
+          const searches = interests.map(i => {
+            const conf = INTEREST_CONFIG[i];
+            return searchKeyword(conf?.keyword || i, conf?.typeId || '12', region, 1, 15);
+          });
           const results = await Promise.all(searches);
           const seen = new Set();
           for (const arr of results) {
@@ -220,17 +232,16 @@ export default function Result() {
             }
           }
         }
+        // 보충: 역사관광지(cat2=A0201)와 문화시설(type14) 추가
         if (items.length < maxStops + 5) {
-          const areaItems = await areaBasedList(region, '', '12', 1, 20);
+          const [areaItems, culture] = await Promise.all([
+            areaBasedList(region, '', '12', 1, 30),
+            areaBasedList(region, '', '14', 1, 15),
+          ]);
           const seen = new Set(items.map(i => i.contentid));
-          for (const item of areaItems) {
+          for (const item of [...areaItems, ...culture]) {
             if (!seen.has(item.contentid)) { seen.add(item.contentid); items.push(item); }
           }
-        }
-        const culture = await areaBasedList(region, '', '14', 1, 10);
-        const seen3 = new Set(items.map(i => i.contentid));
-        for (const item of culture) {
-          if (!seen3.has(item.contentid)) items.push(item);
         }
         items = items.filter(i => i.firstimage && i.mapx && i.mapy && isHeritageSuitable(i));
         if (items.length > maxStops) {
@@ -277,7 +288,7 @@ export default function Result() {
     return (
       <div className="loading">
         <div className="loading-spinner"></div>
-        <p>AI가 맞춤 코스를 만들고 있습니다...</p>
+        <p>AI가 맟촤 코스를 만들고 있습니다...</p>
         <p className="loading-sub">
           {childAge === 'baby' ? '유모차 경로를 확인하는 중' :
            childAge === 'toddler' ? '짧은 거리 위주로 선별 중' :
@@ -373,7 +384,7 @@ export default function Result() {
 
       {course.length > 0 && <SafetyChecklist childAge={childAge} />}
 
-      <p className="data-source">출처: ⓒ한국관광공사</p>
+      <p className="data-source">출처: ⓒ한국톀광공사</p>
     </div>
   );
 }
