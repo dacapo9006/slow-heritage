@@ -55,7 +55,7 @@ const EXCLUDED_KEYWORDS = [
   // 의료
   '병원', '의원', '치과', '약국', '한의원',
   // 교육·돌봄
-  '학원', '어린이짐', '유치원',
+  '학원', '어린이집', '유치원',
   // 생활·서비스
   '부동산', '공인중개', '세탁소', '미용실', '마사지', '에스테틱',
   // 사업체·법인
@@ -64,6 +64,8 @@ const EXCLUDED_KEYWORDS = [
   '공장', '제조', '산업단지', '물류센터', '주유소', '정비소', '렌터카', '터미널', '휴게소', '주차장',
   // 공연·비역사 시설
   '카드홀', '씨어터', '콘서트홀', '공연장',
+  // 서점·독립출판
+  '책방', '서점', '북카페',
 ];
 
 function isHeritageSuitable(item) {
@@ -119,7 +121,7 @@ const SAFETY_CHECKLISTS = {
     '충분한 물과 간식을 챙겼나요?',
     '문화재 보호 규칙을 함께 읽어보았나요?',
     '사전 학습 자료(역사 배경)를 준비했나요?',
-    '사진·메모 돀구를 챙겼나요?',
+    '사진·메모 도구를 챙겼나요?',
     '날씨에 맞는 복장을 준비했나요?',
     '비상 연락처를 아이도 알고 있나요?',
   ],
@@ -201,6 +203,8 @@ export default function Result() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState([]);
+  const [allPlaces, setAllPlaces] = useState([]);
+  const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -222,10 +226,20 @@ export default function Result() {
       try {
         let items = [];
         if (interests.length > 0) {
-          const searches = interests.map(i => {
+          const searches = [];
+          for (const i of interests) {
             const conf = INTEREST_CONFIG[i];
-            return searchKeyword(conf?.keyword || i, conf?.typeId || '12', region, 1, 15);
-          });
+            const kw = conf?.keyword || i;
+            const tid = conf?.typeId || '12';
+            searches.push(searchKeyword(kw, tid, region, 1, 30));
+            // 박물관은 typeId 12(관광지)에도 등록된 경우가 많으므로 추가 검색
+            if (i === '박물관') {
+              searches.push(searchKeyword('박물관', '12', region, 1, 30));
+              searches.push(searchKeyword('역사관', '14', region, 1, 20));
+              searches.push(searchKeyword('기념관', '14', region, 1, 20));
+              searches.push(searchKeyword('전시관', '14', region, 1, 20));
+            }
+          }
           const results = await Promise.all(searches);
           const seen = new Set();
           for (const arr of results) {
@@ -237,8 +251,8 @@ export default function Result() {
         // 보충: 역사관광지(cat2=A0201)와 문화시설(type14) 추가
         if (items.length < maxStops + 5) {
           const [areaItems, culture] = await Promise.all([
-            areaBasedList(region, '', '12', 1, 30),
-            areaBasedList(region, '', '14', 1, 15),
+            areaBasedList(region, '', '12', 1, 50),
+            areaBasedList(region, '', '14', 1, 30),
           ]);
           const seen = new Set(items.map(i => i.contentid));
           for (const item of [...areaItems, ...culture]) {
@@ -246,12 +260,9 @@ export default function Result() {
           }
         }
         items = items.filter(i => i.firstimage && i.mapx && i.mapy && isHeritageSuitable(i));
-        if (items.length > maxStops) {
-          items = sortByRoute(items).slice(0, maxStops);
-        } else {
-          items = sortByRoute(items);
-        }
-        setCourse(items);
+        const sorted = sortByRoute(items);
+        setAllPlaces(sorted);
+        setCourse(sorted.slice(0, maxStops));
       } catch (err) {
         console.error('코스 생성 실패:', err);
         setError('코스를 생성하는 데 실패했습니다. 다시 시도해주세요.');
@@ -284,6 +295,38 @@ export default function Result() {
     if (ok) setSaved(true);
   };
 
+  const courseIds = new Set(course.map(p => p.contentid));
+  const unselected = allPlaces.filter(p => !courseIds.has(p.contentid));
+
+  const togglePlace = (place) => {
+    if (courseIds.has(place.contentid)) {
+      setCourse(prev => prev.filter(p => p.contentid !== place.contentid));
+    } else {
+      setCourse(prev => [...prev, place]);
+    }
+    setSaved(false);
+  };
+
+  const moveUp = (idx) => {
+    if (idx <= 0) return;
+    setCourse(prev => {
+      const arr = [...prev];
+      [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+      return arr;
+    });
+    setSaved(false);
+  };
+
+  const moveDown = (idx) => {
+    if (idx >= course.length - 1) return;
+    setCourse(prev => {
+      const arr = [...prev];
+      [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+      return arr;
+    });
+    setSaved(false);
+  };
+
   const curricula = interests.map(i => CURRICULUM_MAP[i]).filter(Boolean);
 
   if (loading) {
@@ -306,11 +349,23 @@ export default function Result() {
     <div className="result" id="printable-result">
       <button className="btn-back" onClick={() => navigate(-1)}>← 다시 설정</button>
 
-      <h2>{courseType === 'full' ? '하루' : '반나절'} 역사엨행 코스</h2>
+      <h2>{courseType === 'full' ? '하루' : '반나절'} 역사여행 코스</h2>
       <p className="result-meta">
         {AREA_NAMES[region]} · {AGE_LABELS[childAge]}
         {interests.length > 0 && ` · ${interests.join(', ')}`}
       </p>
+
+      {/* 편집 안내 배너 */}
+      {course.length > 0 && unselected.length > 0 && !editMode && (
+        <div className="edit-banner no-print" onClick={() => setEditMode(true)} style={{background:'linear-gradient(135deg,#e8f4fd,#f0e6ff)',padding:'12px 16px',borderRadius:'10px',marginBottom:'16px',cursor:'pointer',border:'1px solid #d0d7de',display:'flex',alignItems:'center',gap:'10px'}}>
+          <span style={{fontSize:'22px'}}>✏️</span>
+          <div>
+            <strong style={{fontSize:'14px'}}>코스를 직접 편집할 수 있어요!</strong>
+            <p style={{fontSize:'13px',color:'#555',margin:'2px 0 0'}}>아래 {unselected.length}개 추가 장소에서 선택하고, 방문 순서도 자유롭게 바꿔보세요.</p>
+          </div>
+          <span style={{marginLeft:'auto',color:'#3498db',fontWeight:'bold',fontSize:'14px',whiteSpace:'nowrap'}}>편집하기 →</span>
+        </div>
+      )}
 
       {/* 교육과정 연계 */}
       {curricula.length > 0 && (
@@ -346,14 +401,23 @@ export default function Result() {
         <span>{ageConf.tip}</span>
       </div>
 
-      {/* 코스 저장 + 인쇄 */}
+      {/* 코스 저장 + 편집 + 인쇄 */}
       <div className="result-actions">
         <button className={`btn-save ${saved ? 'saved' : ''}`} onClick={handleSaveCourse} disabled={saved || course.length === 0}>
           {saved ? "✅ 저장됨" : "💾 이 코스 저장하기"}
         </button>
+        <button className="btn-edit no-print" onClick={() => setEditMode(!editMode)} style={{background: editMode ? '#e74c3c' : '#3498db', color:'#fff', border:'none', padding:'10px 18px', borderRadius:'8px', cursor:'pointer', fontWeight:'bold'}}>
+          {editMode ? "✏️ 편집 완료" : "✏️ 코스 편집"}
+        </button>
         <button className="btn-print no-print" onClick={() => window.print()}>🖨️ 인쇄</button>
       </div>
       <p className="save-guide no-print">💡 저장된 코스는 상단 <strong>📋 저장코스</strong>에서 다시 볼 수 있어요 (이 브라우저에 최대 10개 보관). 인쇄 버튼을 누르면 코스 전체를 PDF로 저장하거나 출력할 수 있습니다.</p>
+
+      {editMode && (
+        <p className="edit-guide no-print" style={{background:'#fff3cd',padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginBottom:'12px'}}>
+          ✏️ <strong>편집 모드</strong>: ▲▼로 순서 변경, ✕로 코스에서 제거. 아래 '추가 가능한 장소'에서 + 를 눌러 코스에 추가할 수 있습니다.
+        </p>
+      )}
 
       {course.length === 0 ? (
         <p className="no-result">조건에 맞는 관광지를 찾지 못했습니다. 다른 지역이나 관심분야를 선택해보세요.</p>
@@ -370,15 +434,41 @@ export default function Result() {
                   </span>
                 </div>
               )}
-              <Link to={`/detail/${place.contentid}?typeId=${place.contenttypeid}&childAge=${childAge}`} className="stop-card">
-                <div className="stop-number">{idx + 1}</div>
-                {place.firstimage && <img src={place.firstimage} alt={place.title} className="stop-img" loading="lazy" />}
-                <div className="stop-info">
-                  <h3>{place.title}</h3>
-                  <p className="stop-addr">{place.addr1}</p>
-                  <p className="stop-time">⏱ 추천 체류 {childAge === 'baby' ? '20분' : '30~40분'}</p>
-                </div>
-              </Link>
+              <div style={{position:'relative'}}>
+                {editMode && (
+                  <div className="edit-controls no-print" style={{position:'absolute',right:'8px',top:'8px',zIndex:2,display:'flex',gap:'4px'}}>
+                    <button onClick={() => moveUp(idx)} disabled={idx===0} style={{width:'30px',height:'30px',border:'1px solid #ccc',borderRadius:'6px',background:'#fff',cursor:'pointer',fontSize:'14px'}} title="위로">▲</button>
+                    <button onClick={() => moveDown(idx)} disabled={idx===course.length-1} style={{width:'30px',height:'30px',border:'1px solid #ccc',borderRadius:'6px',background:'#fff',cursor:'pointer',fontSize:'14px'}} title="아래로">▼</button>
+                    <button onClick={() => togglePlace(place)} style={{width:'30px',height:'30px',border:'1px solid #e74c3c',borderRadius:'6px',background:'#fff',color:'#e74c3c',cursor:'pointer',fontSize:'14px',fontWeight:'bold'}} title="제거">✕</button>
+                  </div>
+                )}
+                <Link to={editMode ? '#' : `/detail/${place.contentid}?typeId=${place.contenttypeid}&childAge=${childAge}`} className="stop-card" onClick={editMode ? (e) => e.preventDefault() : undefined}>
+                  <div className="stop-number">{idx + 1}</div>
+                  {place.firstimage && <img src={place.firstimage} alt={place.title} className="stop-img" loading="lazy" />}
+                  <div className="stop-info">
+                    <h3>{place.title}</h3>
+                    <p className="stop-addr">{place.addr1}</p>
+                    <p className="stop-time">⏱ 추천 체류 {childAge === 'baby' ? '20분' : '30~40분'}</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 편집 모드: 추가 가능한 장소 */}
+      {editMode && unselected.length > 0 && (
+        <div className="unselected-places no-print" style={{marginTop:'20px',padding:'16px',background:'#f8f9fa',borderRadius:'12px'}}>
+          <h3 style={{fontSize:'16px',marginBottom:'12px'}}>📍 추가 가능한 장소 ({unselected.length}개)</h3>
+          {unselected.map(place => (
+            <div key={place.contentid} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',background:'#fff',borderRadius:'8px',marginBottom:'8px',border:'1px solid #e0e0e0'}}>
+              {place.firstimage && <img src={place.firstimage} alt={place.title} style={{width:'50px',height:'50px',objectFit:'cover',borderRadius:'6px'}} />}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:'bold',fontSize:'14px'}}>{place.title}</div>
+                <div style={{fontSize:'12px',color:'#666',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{place.addr1}</div>
+              </div>
+              <button onClick={() => togglePlace(place)} style={{width:'32px',height:'32px',border:'1px solid #27ae60',borderRadius:'6px',background:'#27ae60',color:'#fff',cursor:'pointer',fontSize:'18px',flexShrink:0}} title="코스에 추가">+</button>
             </div>
           ))}
         </div>
