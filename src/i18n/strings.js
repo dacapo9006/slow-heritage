@@ -56,6 +56,10 @@ export const STRINGS = {
   summaryTime: { ko: '예상 소요', en: 'Est. Time' },
   safetyTitle: { ko: '🛡️ 안전 체크리스트', en: '🛡️ Safety Checklist' },
   dataSource: { ko: '출처: ⓒ한국관광공사', en: 'Source: ⓒKorea Tourism Organization' },
+  noResultsTitle: { ko: '검색 결과가 없습니다', en: 'No Results Found' },
+  noResultsHint: { ko: '다른 지역이나 관심 분야를 선택해보세요.', en: 'Try a different region or interest.' },
+  resetBtn: { ko: '다시 설정하기', en: 'Start Over' },
+  noResultsNotFound: { ko: '조건에 맞는 관광지를 찾지 못했습니다. 다른 지역이나 관심분야를 선택해보세요.', en: 'No matching attractions found. Try a different region or interest.' },
   enNote: { ko: '', en: 'Place names and addresses are shown in English via the Korea Tourism Organization English API. Stories, quizzes, and prompts remain Korean-only.' },
 
   // Detail
