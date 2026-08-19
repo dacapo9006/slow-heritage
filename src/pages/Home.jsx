@@ -62,7 +62,7 @@ function UsageGuide({ t }) {
       </button>
       {!open && (
         <div style={{padding:'0 18px 14px',display:'flex',gap:'6px',flexWrap:'wrap'}}>
-          {['지역 선택','코스 편집','저장·출력'].map((tag, i) => (
+          {[t('guideTag1'), t('guideTag2'), t('guideTag3')].map((tag, i) => (
             <span key={i} style={{background:'#f0fdfa',color:'#0e7490',fontSize:'11px',padding:'4px 10px',borderRadius:'20px',border:'1px solid #99f6e4',fontWeight:'600'}}>{tag}</span>
           ))}
         </div>
