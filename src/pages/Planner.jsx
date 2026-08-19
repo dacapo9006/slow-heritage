@@ -1,5 +1,29 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLanguage } from '../context/LanguageContext';
+
+const REGION_NAMES_EN = {
+  '1': 'Seoul', '2': 'Incheon', '3': 'Daejeon', '4': 'Daegu', '5': 'Gwangju',
+  '6': 'Busan', '7': 'Ulsan', '8': 'Sejong', '31': 'Gyeonggi', '32': 'Gangwon',
+  '33': 'Chungbuk', '34': 'Chungnam', '35': 'Gyeongbuk', '36': 'Gyeongnam',
+  '37': 'Jeonbuk', '38': 'Jeonnam', '39': 'Jeju',
+};
+
+const AGE_LABELS_EN = {
+  baby: '0–2 yrs (Infant)', toddler: '3–5 yrs (Toddler)', child: '6–9 yrs (Early Elem.)',
+  upper: '10–13 yrs (Late Elem.)', middle: '14–15 yrs (Middle School)',
+};
+const AGE_DESC_EN = {
+  baby: 'Stroller required, short course', toddler: 'Under 30 min walking, activity-focused',
+  child: 'History education, missions available', upper: 'Deeper history, longer courses OK',
+  middle: 'Self-directed exploration, curriculum-linked',
+};
+const COURSE_LABELS_EN = { half: 'Half-Day Trip', full: 'Full-Day Trip' };
+const COURSE_DESC_EN = { half: '2–3 hrs, 3 stops', full: '5–6 hrs, 5 stops' };
+const INTEREST_EN = {
+  '궁궐': 'Palaces', '사찰': 'Temples', '성곽': 'Fortresses', '고분': 'Ancient Tombs',
+  '서원·향교': 'Confucian Schools', '박물관': 'Museums', '전통마을': 'Traditional Villages', '근현대역사': 'Modern History',
+};
 
 const REGIONS = [
   { code: '1', name: '서울' },
@@ -36,6 +60,7 @@ const COURSE_TYPES = [
 
 export default function Planner() {
   const navigate = useNavigate();
+  const { lang, t } = useLanguage();
   const [childAge, setChildAge] = useState('');
   const [region, setRegion] = useState('');
   const [courseType, setCourseType] = useState('half');
@@ -60,11 +85,11 @@ export default function Planner() {
 
   return (
     <div className="planner">
-      <h2>여행 계획 세우기</h2>
+      <h2>{t('plannerTitle')}</h2>
       <form onSubmit={handleSubmit}>
 
         <fieldset>
-          <legend>아이 나이대</legend>
+          <legend>{t('ageLegend')}</legend>
           <div className="age-grid">
             {AGE_GROUPS.map((ag) => (
               <div
@@ -74,25 +99,25 @@ export default function Planner() {
                 role="button"
                 tabIndex={0}
               >
-                <strong>{ag.label}</strong>
-                <span>{ag.desc}</span>
+                <strong>{lang === 'en' ? AGE_LABELS_EN[ag.value] : ag.label}</strong>
+                <span>{lang === 'en' ? AGE_DESC_EN[ag.value] : ag.desc}</span>
               </div>
             ))}
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>여행 지역</legend>
+          <legend>{t('regionLegend')}</legend>
           <select value={region} onChange={(e) => setRegion(e.target.value)}>
-            <option value="">지역을 선택하세요</option>
+            <option value="">{t('regionPlaceholder')}</option>
             {REGIONS.map((r) => (
-              <option key={r.code} value={r.code}>{r.name}</option>
+              <option key={r.code} value={r.code}>{lang === 'en' ? REGION_NAMES_EN[r.code] : r.name}</option>
             ))}
           </select>
         </fieldset>
 
         <fieldset>
-          <legend>코스 유형</legend>
+          <legend>{t('courseTypeLegend')}</legend>
           <div className="age-grid">
             {COURSE_TYPES.map((ct) => (
               <div
@@ -102,15 +127,15 @@ export default function Planner() {
                 role="button"
                 tabIndex={0}
               >
-                <strong>{ct.icon} {ct.label}</strong>
-                <span>{ct.desc}</span>
+                <strong>{ct.icon} {lang === 'en' ? COURSE_LABELS_EN[ct.value] : ct.label}</strong>
+                <span>{lang === 'en' ? COURSE_DESC_EN[ct.value] : ct.desc}</span>
               </div>
             ))}
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>관심 분야 (복수 선택 가능)</legend>
+          <legend>{t('interestLegend')}</legend>
           <div className="interest-grid">
             {INTEREST_OPTIONS.map((item) => (
               <button
@@ -119,7 +144,7 @@ export default function Planner() {
                 className={`chip ${interests.includes(item) ? 'active' : ''}`}
                 onClick={() => toggleInterest(item)}
               >
-                {item}
+                {lang === 'en' ? INTEREST_EN[item] : item}
               </button>
             ))}
           </div>
@@ -127,7 +152,7 @@ export default function Planner() {
 
         {!canSubmit && (
           <p className="form-hint">
-            아이 나이대, 여행 지역, 코스 유형, 관심 분야를 선택해주세요
+            {t('formHint')}
           </p>
         )}
 
@@ -136,7 +161,7 @@ export default function Planner() {
           className="btn-primary"
           disabled={!canSubmit}
         >
-          AI 코스 추천받기
+          {t('submitBtn')}
         </button>
       </form>
     </div>
