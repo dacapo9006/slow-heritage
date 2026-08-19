@@ -25,8 +25,8 @@ const AGE_GROUPS = [
   { value: 'baby', label: '0~2세 (유아)', desc: '유모차 필수, 짧은 코스' },
   { value: 'toddler', label: '3~5세 (걸음마)', desc: '30분 이내 도보, 체험 중심' },
   { value: 'child', label: '6~9세 (초등저)', desc: '역사교육, 미션 가능' },
-  { value: 'upper', label: '10~13세 (초등고)', desc: '깊이 있는 역사 해설, 긴 코스 OK' },
-  { value: 'middle', label: '14~15세 (중학생)', desc: '자율 탐구형, 교과 연계 심화' },
+  { value: 'upper', label: '10~13세 (초등고)', desc: '근육 역사 설명, 긴 코스 OK' },
+  { value: 'middle', label: '14~15세 (중학생)', desc: '자율 탐구형, 교과 연계' },
 ];
 
 const COURSE_TYPES = [
@@ -51,12 +51,12 @@ export default function Planner() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!childAge || !region) return;
+    if (!childAge || !region || interests.length === 0) return;
     const params = new URLSearchParams({ childAge, region, courseType, interests: interests.join(',') });
     navigate(`/result?${params}`);
   };
 
-  const canSubmit = childAge && region;
+  const canSubmit = childAge && region && interests.length > 0;
 
   return (
     <div className="planner">
@@ -127,8 +127,7 @@ export default function Planner() {
 
         {!canSubmit && (
           <p className="form-hint">
-            {!childAge && !region ? '아이 나이대와 여행 지역을 선택해주세요' :
-             !childAge ? '아이 나이대를 선택해주세요' : '여행 지역을 선택해주세요'}
+            아이 나이대, 여행 지역, 코스 유형, 관심 분야를 선택해주세요
           </p>
         )}
 
@@ -139,7 +138,6 @@ export default function Planner() {
         >
           AI 코스 추천받기
         </button>
-        <p style={{fontSize:'13px',color:'#888',textAlign:'center',marginTop:'8px'}}>💡 추천 결과에서 장소를 추가/제거하고 순서도 변경할 수 있어요</p>
       </form>
     </div>
   );
