@@ -7,6 +7,7 @@
  */
 
 const TOUR_API_BASE = 'https://apis.data.go.kr/B551011/KorService2';
+const TOUR_API_BASE_EN = 'https://apis.data.go.kr/B551011/EngService2';
 
 const ALLOWED_OPS = [
   'searchKeyword2', 'areaBasedList2', 'locationBasedList2',
@@ -27,7 +28,15 @@ export default {
     }
 
     const url = new URL(request.url);
-    const op = url.pathname.replace('/api/tour/', '');
+    let path = url.pathname.replace('/api/tour/', '');
+
+    // 영문 서비스(EngService2) 라우팅: /api/tour/en/{operation}
+    let isEn = false;
+    if (path.startsWith('en/')) {
+      isEn = true;
+      path = path.replace('en/', '');
+    }
+    const op = path;
 
     if (!ALLOWED_OPS.includes(op)) {
       return Response.json({ error: '허용되지 않은 오퍼레이션' }, { status: 400, headers: CORS });
@@ -39,8 +48,10 @@ export default {
     if (!params.has('MobileOS')) params.set('MobileOS', 'ETC');
     if (!params.has('MobileApp')) params.set('MobileApp', 'SlowHeritage');
 
+    const base = isEn ? TOUR_API_BASE_EN : TOUR_API_BASE;
+
     try {
-      const res = await fetch(`${TOUR_API_BASE}/${op}?${params}`, {
+      const res = await fetch(`${base}/${op}?${params}`, {
         cf: { cacheTtl: 0, cacheEverything: false },
       });
       const data = await res.text();
