@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { areaBasedList, searchKeyword, locationBasedList, IMAGE_OVERRIDES } from '../api/tourApi';
+import { areaBasedList, searchKeyword, locationBasedList, IMAGE_OVERRIDES, detailCommonEn } from '../api/tourApi';
+import { useLanguage } from '../context/LanguageContext';
+
+const AREA_NAMES_EN = {
+  '1': 'Seoul', '2': 'Incheon', '3': 'Daejeon', '4': 'Daegu', '5': 'Gwangju',
+  '6': 'Busan', '7': 'Ulsan', '8': 'Sejong', '31': 'Gyeonggi', '32': 'Gangwon',
+  '33': 'Chungbuk', '34': 'Chungnam', '35': 'Gyeongbuk', '36': 'Gyeongnam',
+  '37': 'Jeonbuk', '38': 'Jeonnam', '39': 'Jeju',
+};
+const AGE_LABELS_EN = {
+  baby: '0–2 yrs', toddler: '3–5 yrs', child: '6–9 yrs', upper: '10–13 yrs', middle: '14–15 yrs',
+};
+const INTEREST_EN = {
+  '궁궐': 'Palaces', '사찰': 'Temples', '성곽': 'Fortresses', '고분': 'Ancient Tombs',
+  '서원·향교': 'Confucian Schools', '박물관': 'Museums', '전통마을': 'Traditional Villages', '근현대역사': 'Modern History',
+};
 
 const AREA_NAMES = {
   '1': '서울', '2': '인천', '3': '대전', '4': '대구', '5': '광주',
@@ -201,7 +216,7 @@ function saveCourse(courseData) {
   } catch { return false; }
 }
 
-function SafetyChecklist({ childAge }) {
+function SafetyChecklist({ childAge, safetyTitle }) {
   const [checked, setChecked] = useState({});
   const items = SAFETY_CHECKLISTS[childAge] || SAFETY_CHECKLISTS.child;
   const toggle = (i) => setChecked(prev => ({ ...prev, [i]: !prev[i] }));
@@ -209,7 +224,7 @@ function SafetyChecklist({ childAge }) {
 
   return (
     <div className="safety-section">
-      <h3 className="safety-title">🛡️ 안전 체크리스트</h3>
+      <h3 className="safety-title">{safetyTitle || '🛡️ 안전 체크리스트'}</h3>
       <p className="safety-desc">{AGE_LABELS[childAge]} 기준</p>
       <div className="safety-list">
         {items.map((item, i) => (
@@ -315,12 +330,14 @@ function CourseMap({ places }) {
 export default function Result() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { lang, t } = useLanguage();
   const [course, setCourse] = useState([]);
   const [allPlaces, setAllPlaces] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [enNames, setEnNames] = useState({}); // contentid -> { title, addr1 }
 
   const region = searchParams.get('region');
   const childAge = searchParams.get('childAge') || 'child';
@@ -431,6 +448,31 @@ export default function Result() {
     if (region) buildCourse();
   }, [region, childAge, courseType, interests.join(',')]);
 
+  // 영어 모드: 코스에 포함된 장소들의 영문 이름/주소를 EngService2로 조회
+  useEffect(() => {
+    if (lang !== 'en' || course.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const targets = course.filter(p => !enNames[p.contentid]);
+      if (targets.length === 0) return;
+      const results = await Promise.allSettled(targets.map(p => detailCommonEn(p.contentid)));
+      if (cancelled) return;
+      setEnNames(prev => {
+        const next = { ...prev };
+        results.forEach((r, i) => {
+          if (r.status === 'fulfilled' && r.value) {
+            next[targets[i].contentid] = { title: r.value.title, addr1: r.value.addr1 };
+          }
+        });
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [lang, course]);
+
+  const displayName = (place) => (lang === 'en' && enNames[place.contentid]?.title) || place.title;
+  const displayAddr = (place) => (lang === 'en' && enNames[place.contentid]?.addr1) || place.addr1;
+
   let totalDist = 0;
   const segments = [];
   for (let i = 1; i < course.length; i++) {
@@ -524,15 +566,25 @@ export default function Result() {
     );
   }
 
+  const areaLabel = lang === 'en' ? (AREA_NAMES_EN[region] || AREA_NAMES[region]) : AREA_NAMES[region];
+  const ageLabel = lang === 'en' ? (AGE_LABELS_EN[childAge] || AGE_LABELS[childAge]) : AGE_LABELS[childAge];
+  const interestLabels = interests.map(i => lang === 'en' ? (INTEREST_EN[i] || i) : i);
+
   return (
     <div className="result" id="printable-result" translate="no">
-      <button className="btn-back" onClick={() => navigate(-1)}>← 다시 설정</button>
+      <button className="btn-back" onClick={() => navigate(-1)}>{t('backToSetup')}</button>
 
-      <h2>{courseType === 'full' ? '하루' : '반나절'} 역사여행 코스</h2>
+      <h2>{courseType === 'full' ? t('resultTitleFull') : t('resultTitleHalf')}</h2>
       <p className="result-meta">
-        {AREA_NAMES[region]} · {AGE_LABELS[childAge]}
-        {interests.length > 0 && ` · ${interests.join(', ')}`}
+        {areaLabel} · {ageLabel}
+        {interestLabels.length > 0 && ` · ${interestLabels.join(', ')}`}
       </p>
+
+      {lang === 'en' && (
+        <div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'12px',padding:'10px 14px',marginBottom:'14px',fontSize:'12px',color:'#1e40af',lineHeight:'1.6'}}>
+          {t('enNote')}
+        </div>
+      )}
 
       {/* 오버투어리즘 분산 — 한적한 명소 배너 */}
       {course.length > 0 && (
@@ -540,15 +592,17 @@ export default function Result() {
           <span style={{fontSize:'22px',flexShrink:0,marginTop:'1px'}}>🌿</span>
           <div>
             <div style={{fontWeight:'700',fontSize:'14px',color:'#065f46',marginBottom:'4px'}}>
-              이 코스는 유명 관광지 대신, 한적한 역사 명소 위주로 구성되었습니다
+              {t('overtourismBannerTitle')}
             </div>
             <div style={{fontSize:'12px',color:'#047857',lineHeight:'1.5'}}>
-              한국관광공사 데이터 기반으로 관광지 쏠림이 적은 {AREA_NAMES[region]} 지역의 숨은 역사·문화 유적을 선별했습니다. 아이와 여유롭게 둘러보세요.
+              {lang === 'en'
+                ? `Based on Korea Tourism Organization data, we selected lesser-visited heritage sites in ${areaLabel} to explore at a relaxed pace with your kids.`
+                : `한국관광공사 데이터 기반으로 관광지 쏠림이 적은 ${AREA_NAMES[region]} 지역의 숨은 역사·문화 유적을 선별했습니다. 아이와 여유롭게 둘러보세요.`}
             </div>
             <div style={{display:'flex',gap:'6px',marginTop:'8px',flexWrap:'wrap'}}>
-              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>오버투어리즘 분산</span>
-              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>숨은 명소</span>
-              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>아이 동반 적합</span>
+              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>{t('overtourismTag1')}</span>
+              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>{t('overtourismTag2')}</span>
+              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>{t('overtourismTag3')}</span>
             </div>
           </div>
         </div>
@@ -583,15 +637,15 @@ export default function Result() {
       <div className="course-summary">
         <div className="summary-item">
           <span className="summary-num">{course.length}</span>
-          <span className="summary-label">방문지</span>
+          <span className="summary-label">{t('summaryStops')}</span>
         </div>
         <div className="summary-item">
           <span className="summary-num">{totalDist < 1 ? `${Math.round(totalDist*1000)}m` : `${totalDist.toFixed(1)}km`}</span>
-          <span className="summary-label">총 거리</span>
+          <span className="summary-label">{t('summaryDist')}</span>
         </div>
         <div className="summary-item">
-          <span className="summary-num">{totalTime < 60 ? `${totalTime}분` : `${Math.floor(totalTime/60)}시간 ${totalTime%60}분`}</span>
-          <span className="summary-label">예상 소요</span>
+          <span className="summary-num">{totalTime < 60 ? (lang === 'en' ? `${totalTime} min` : `${totalTime}분`) : (lang === 'en' ? `${Math.floor(totalTime/60)}h ${totalTime%60}m` : `${Math.floor(totalTime/60)}시간 ${totalTime%60}분`)}</span>
+          <span className="summary-label">{t('summaryTime')}</span>
         </div>
       </div>
 
@@ -604,10 +658,10 @@ export default function Result() {
       {/* 액션 버튼 바 */}
       <div style={{display:'flex',gap:'8px',marginBottom:'14px'}}>
         <button className={`btn-save ${saved ? 'saved' : ''}`} onClick={handleSaveCourse} disabled={saved || course.length === 0} style={{flex:1,padding:'12px',borderRadius:'10px',border:'none',fontWeight:'700',fontSize:'14px',cursor:'pointer',background: saved ? '#d1fae5' : 'linear-gradient(135deg,#0e7490,#0891b2)',color: saved ? '#065f46' : '#fff',boxShadow: saved ? 'none' : '0 2px 8px rgba(14,116,144,0.3)',transition:'all 0.2s'}}>
-          {saved ? "✅ 저장됨" : "💾 코스 저장"}
+          {saved ? t('savedBtn') : t('saveCourseBtn')}
         </button>
         <button className="no-print" onClick={() => setEditMode(!editMode)} style={{padding:'12px 16px',borderRadius:'10px',border: editMode ? '2px solid #e74c3c' : '2px solid #3498db',background: editMode ? '#fef2f2' : '#eff6ff',color: editMode ? '#dc2626' : '#2563eb',fontWeight:'700',fontSize:'14px',cursor:'pointer',transition:'all 0.2s'}}>
-          {editMode ? "✏️ 완료" : "✏️ 편집"}
+          {editMode ? t('editDoneBtn') : t('editBtn')}
         </button>
         <button className="no-print" onClick={() => window.print()} style={{padding:'12px 16px',borderRadius:'10px',border:'2px solid #e2e8f0',background:'#f8fafc',color:'#475569',fontWeight:'700',fontSize:'14px',cursor:'pointer'}}>
           🖨️
@@ -685,8 +739,8 @@ export default function Result() {
                   <div className="stop-number">{idx + 1}</div>
                   {place.firstimage && <img src={place.firstimage} alt={place.title} className="stop-img" loading="lazy" />}
                   <div className="stop-info">
-                    <h3>{place.title}</h3>
-                    <p className="stop-addr">{place.addr1}</p>
+                    <h3>{displayName(place)}</h3>
+                    <p className="stop-addr">{displayAddr(place)}</p>
                     <div style={{display:'flex',gap:'4px',flexWrap:'wrap',margin:'4px 0'}}>
                       <span style={{background:'#ecfdf5',color:'#065f46',fontSize:'11px',padding:'2px 8px',borderRadius:'12px',border:'1px solid #a7f3d0',fontWeight:'600'}}>숨은 명소</span>
                       {CURRICULUM_MAP[interests[0]] && <span style={{background:'#fef3c7',color:'#92400e',fontSize:'11px',padding:'2px 8px',borderRadius:'12px',border:'1px solid #fde68a',fontWeight:'600'}}>교과 연계</span>}
@@ -717,9 +771,9 @@ export default function Result() {
         </div>
       )}
 
-      {course.length > 0 && <SafetyChecklist childAge={childAge} />}
+      {course.length > 0 && <SafetyChecklist childAge={childAge} safetyTitle={t('safetyTitle')} />}
 
-      <p className="data-source">출처: ⓒ한국관광공사</p>
+      <p className="data-source">{t('dataSource')}</p>
     </div>
   );
 }
