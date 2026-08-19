@@ -82,6 +82,29 @@ export async function detailCommon(contentId) {
   });
 }
 
+/**
+ * 영문 상세 정보 조회 (EngService2)
+ * contentId는 언어와 무관하게 동일 — 이름/주소/개요만 영문으로 대체 표시할 때 사용
+ */
+export async function detailCommonEn(contentId) {
+  const query = new URLSearchParams({
+    MobileOS: 'ETC',
+    MobileApp: 'SlowHeritage',
+    _type: 'json',
+    contentId,
+    numOfRows: 1,
+  });
+  try {
+    const res = await fetch(`${API_BASE}/en/detailCommon2?${query}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const items = data.response?.body?.items?.item || [];
+    return Array.isArray(items) ? items[0] : items;
+  } catch {
+    return null;
+  }
+}
+
 /** 소개 정보 조회 */
 export async function detailIntro(contentId, contentTypeId) {
   return callTourApi('detailIntro2', {
