@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { detailCommon, detailIntro, IMAGE_OVERRIDES } from '../api/tourApi';
+import { detailCommon, detailCommonEn, detailIntro, IMAGE_OVERRIDES } from '../api/tourApi';
+import { useLanguage } from '../context/LanguageContext';
 
 function KakaoMap({ lat, lng, title }) {
   const mapRef = useRef(null);
@@ -229,7 +230,9 @@ export default function Detail() {
   const { contentId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { lang, t } = useLanguage();
   const [detail, setDetail] = useState(null);
+  const [detailEn, setDetailEn] = useState(null);
   const [intro, setIntro] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -241,11 +244,13 @@ export default function Detail() {
     async function fetchDetail() {
       setLoading(true);
       try {
-        const [commonItems, introItems] = await Promise.all([
+        const [commonItems, introItems, enItem] = await Promise.all([
           detailCommon(contentId), detailIntro(contentId, typeId),
+          lang === 'en' ? detailCommonEn(contentId) : Promise.resolve(null),
         ]);
         setDetail((Array.isArray(commonItems) ? commonItems[0] : commonItems) || null);
         setIntro((Array.isArray(introItems) ? introItems[0] : introItems) || null);
+        setDetailEn(enItem || null);
       } catch (err) {
         console.error('Detail fetch error:', err);
         setError('상세 정보를 불러오지 못했습니다.');
@@ -254,7 +259,7 @@ export default function Detail() {
       }
     }
     if (contentId) fetchDetail();
-  }, [contentId, typeId]);
+  }, [contentId, typeId, lang]);
 
   if (loading) {
     return (
@@ -268,41 +273,51 @@ export default function Detail() {
   if (error || !detail) return <div className="error">{error || '정보를 찾을 수 없습니다.'}</div>;
 
   const stripHtml = (html) => html?.replace(/<[^>]*>/g, '') || '';
+  const isEn = lang === 'en';
+  const displayTitle = (isEn && detailEn?.title) || detail.title;
+  const displayAddr = (isEn && detailEn?.addr1) ? `${detailEn.addr1} ${detailEn.addr2 || ''}` : `${detail.addr1} ${detail.addr2 || ''}`;
+  const displayOverview = (isEn && detailEn?.overview) || detail.overview;
   const quiz = generateQuiz(detail.title, detail.overview, childAge);
   const story = generateStory(detail.title, detail.overview, childAge);
 
   return (
     <div className="detail">
-      <button className="btn-back" onClick={() => navigate(-1)}>← 뒤로</button>
+      <button className="btn-back" onClick={() => navigate(-1)}>{t('backBtn')}</button>
 
-      {(IMAGE_OVERRIDES[String(detail.contentid)] || detail.firstimage) && <img src={IMAGE_OVERRIDES[String(detail.contentid)] || detail.firstimage} alt={detail.title} className="detail-img" />}
+      {(IMAGE_OVERRIDES[String(detail.contentid)] || detail.firstimage) && <img src={IMAGE_OVERRIDES[String(detail.contentid)] || detail.firstimage} alt={displayTitle} className="detail-img" />}
 
-      <div className="detail-title-row"><h2>{detail.title}</h2></div>
-      <p className="detail-addr">{detail.addr1} {detail.addr2 || ''}</p>
+      <div className="detail-title-row"><h2>{displayTitle}</h2></div>
+      <p className="detail-addr">{displayAddr}</p>
       {detail.tel && <p className="detail-tel">📞 {detail.tel}</p>}
 
-      {story && (
+      {isEn && (
+        <div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'12px',padding:'12px 14px',margin:'12px 0',fontSize:'13px',color:'#1e40af',lineHeight:'1.6'}}>
+          {t('koOnlyNotice')}
+        </div>
+      )}
+
+      {!isEn && story && (
         <div className="story-box">
           <h3>📖 {story.title}</h3>
           <p>{story.body}</p>
         </div>
       )}
 
-      {detail.overview && (
+      {displayOverview && (
         <div className="detail-section">
-          <h3>소개</h3>
-          <p>{stripHtml(detail.overview)}</p>
+          <h3>{t('introTitle')}</h3>
+          <p>{stripHtml(displayOverview)}</p>
         </div>
       )}
 
-      <QuizSection quiz={quiz} />
+      {!isEn && <QuizSection quiz={quiz} />}
 
-      {/* AI 프롬프트 갤러리 */}
-      <PromptGallery title={detail.title} childAge={childAge} />
+      {/* AI 프롬프트 갤러리 (한국어 전용) */}
+      {!isEn && <PromptGallery title={detail.title} childAge={childAge} />}
 
-      {intro && typeId === '12' && (
+      {!isEn && intro && typeId === '12' && (
         <div className="detail-section">
-          <h3>이용 안내</h3>
+          <h3>{t('usageInfoTitle')}</h3>
           {intro.usetime && <p>⏰ 이용시간: {stripHtml(intro.usetime)}</p>}
           {intro.restdate && <p>🚫 쉬는날: {stripHtml(intro.restdate)}</p>}
           {intro.parking && <p>🅿️ 주차: {stripHtml(intro.parking)}</p>}
@@ -312,9 +327,9 @@ export default function Detail() {
         </div>
       )}
 
-      {intro && typeId === '14' && (
+      {!isEn && intro && typeId === '14' && (
         <div className="detail-section">
-          <h3>이용 안내</h3>
+          <h3>{t('usageInfoTitle')}</h3>
           {intro.usetimeculture && <p>⏰ 이용시간: {stripHtml(intro.usetimeculture)}</p>}
           {intro.restdateculture && <p>🚫 쉬는날: {stripHtml(intro.restdateculture)}</p>}
           {intro.parkingculture && <p>🅿️ 주차: {stripHtml(intro.parkingculture)}</p>}
@@ -326,10 +341,10 @@ export default function Detail() {
       )}
 
       {detail.mapx && detail.mapy && (
-        <KakaoMap lat={parseFloat(detail.mapy)} lng={parseFloat(detail.mapx)} title={detail.title} />
+        <KakaoMap lat={parseFloat(detail.mapy)} lng={parseFloat(detail.mapx)} title={displayTitle} />
       )}
 
-      <p className="data-source">출처: ⓒ한국관광공사</p>
+      <p className="data-source">{t('dataSource')}</p>
     </div>
   );
 }
