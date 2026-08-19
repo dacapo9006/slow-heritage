@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { areaBasedList, searchKeyword, locationBasedList } from '../api/tourApi';
+import { areaBasedList, searchKeyword, locationBasedList, IMAGE_OVERRIDES } from '../api/tourApi';
 
 const AREA_NAMES = {
   '1': '서울', '2': '인천', '3': '대전', '4': '대구', '5': '광주',
@@ -23,14 +23,30 @@ const AGE_CONFIG = {
 };
 
 const INTEREST_CONFIG = {
-  '궁궐':      { keyword: '궁궐',     typeId: '12', cat3: ['A02010100'] },
-  '사찰':      { keyword: '사찰',     typeId: '12', cat3: ['A02010800'] },
-  '성곽':      { keyword: '성곽',     typeId: '12', cat3: ['A02010200', 'A02010700'] },
-  '고분':      { keyword: '고분',     typeId: '12', cat3: ['A02010700'] },
-  '서원·향교': { keyword: '서원',     typeId: '12', cat3: ['A02010700'] },
-  '박물관':    { keyword: '박물관',   typeId: '14', cat3: ['A02060100', 'A02060200', 'A02060300'] },
-  '전통마을':  { keyword: '전통마을', typeId: '12', cat3: ['A02010600'] },
-  '근현대역사': { keyword: '근대역사', typeId: '12', cat3: ['A02010700', 'A02011000'] },
+  '궁궐':      { keyword: '궁궐',     typeId: '12', cat1: 'A02', cat2: 'A0201', cat3: ['A02010100'], preciseCat3: true,
+                 extraKeywords: ['궁', '왕궁', '행궁'],
+                 matchKeywords: ['궁', '궁궐', '왕궁', '행궁'] },
+  '사찰':      { keyword: '사찰',     typeId: '12', cat1: 'A02', cat2: 'A0201', cat3: ['A02010800'], preciseCat3: true,
+                 extraKeywords: ['사찰', '절', '암자', '사'],
+                 matchKeywords: ['사', '절', '암', '사찰', '암자', '선원', '총림'] },
+  '성곽':      { keyword: '성곽',     typeId: '12', cat1: 'A02', cat2: 'A0201', cat3: ['A02010200'], preciseCat3: true,
+                 extraKeywords: ['산성', '읍성', '성벽', '성문'],
+                 matchKeywords: ['성', '산성', '읍성', '성곽', '성벽', '성문', '성터'] },
+  '고분':      { keyword: '고분',     typeId: '12', cat1: 'A02', cat2: 'A0201', cat3: ['A02010700'], preciseCat3: false,
+                 extraKeywords: ['고분군', '왕릉', '능', '무덤', '유적'],
+                 matchKeywords: ['고분', '왕릉', '능', '무덤', '묘', '총', '유적', '릉'] },
+  '서원·향교': { keyword: '서원',     typeId: '12', cat1: 'A02', cat2: 'A0201', cat3: ['A02010700'], preciseCat3: false,
+                 extraKeywords: ['향교', '서당', '강당'],
+                 matchKeywords: ['서원', '향교', '서당', '강당', '학당'] },
+  '박물관':    { keyword: '박물관',   typeId: '14', cat1: 'A02', cat2: 'A0206', cat3: ['A02060100', 'A02060200', 'A02060300'], preciseCat3: true,
+                 extraKeywords: ['역사관', '기념관', '전시관', '유물관'],
+                 matchKeywords: ['박물관', '역사관', '기념관', '전시관', '유물관', '전시실'] },
+  '전통마을':  { keyword: '전통마을', typeId: '12', cat1: 'A02', cat2: 'A0201', cat3: ['A02010600'], preciseCat3: true,
+                 extraKeywords: ['한옥마을', '민속마을', '전통가옥'],
+                 matchKeywords: ['마을', '한옥', '민속', '전통가옥', '고택', '종택'] },
+  '근현대역사': { keyword: '근대역사', typeId: '12', cat1: 'A02', cat2: 'A0201', cat3: ['A02010700', 'A02011000'], preciseCat3: false,
+                 extraKeywords: ['근대', '독립', '항일', '기념관', '역사관'],
+                 matchKeywords: ['근대', '근현대', '독립', '항일', '기념', '역사관', '3.1', '독립운동', '일제'] },
 };
 
 /** 역사·문화 관련 cat2만 허용 (A0201=역사관광지, A0206=문화시설) */
@@ -40,6 +56,7 @@ const HERITAGE_CAT2 = new Set(['A0201', 'A0206']);
 const BLOCKED_IDS = new Set([
   '3452166',  // 커넥트현대 (백화점)
   '2822910',  // 창비부산 (폐업)
+  '2390314',  // 한복남 경복궁점 (한복대여점, 역사관광 부적합)
 ]);
 
 const EXCLUDED_KEYWORDS = [
@@ -75,6 +92,14 @@ function isHeritageSuitable(item) {
   // cat2 카테고리 필터: 역사관광지(A0201) 또는 문화시설(A0206)만 허용
   if (item.cat2 && !HERITAGE_CAT2.has(item.cat2)) return false;
   return true;
+}
+
+/** title 기반 관심사 매칭 — 보충검색 결과에만 적용 */
+function matchesInterest(item, interestKey) {
+  const cfg = INTEREST_CONFIG[interestKey];
+  if (!cfg?.matchKeywords) return true;
+  const title = (item.title || '').toLowerCase();
+  return cfg.matchKeywords.some(kw => title.includes(kw));
 }
 
 
@@ -199,6 +224,94 @@ function SafetyChecklist({ childAge }) {
   );
 }
 
+function CourseMap({ places }) {
+  const mapRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [mapError, setMapError] = useState(false);
+
+  const validPlaces = places.filter(p => p.mapx && p.mapy);
+
+  useEffect(() => {
+    if (!open || !mapRef.current || validPlaces.length === 0) return;
+
+    const initMap = () => {
+      try {
+        const kakao = window.kakao;
+        const bounds = new kakao.maps.LatLngBounds();
+        const positions = validPlaces.map(p => {
+          const pos = new kakao.maps.LatLng(parseFloat(p.mapy), parseFloat(p.mapx));
+          bounds.extend(pos);
+          return pos;
+        });
+
+        const map = new kakao.maps.Map(mapRef.current, { center: positions[0], level: 7 });
+        map.setBounds(bounds, 60);
+
+        validPlaces.forEach((p, i) => {
+          new kakao.maps.CustomOverlay({
+            map,
+            position: positions[i],
+            content: `<div style="background:#0e7490;color:#fff;border-radius:16px;padding:4px 10px;font-size:12px;font-weight:bold;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;cursor:default;">${i + 1}. ${p.title}</div>`,
+            yAnchor: 1.2,
+          });
+        });
+
+        // 마커 사이 연결선
+        if (positions.length > 1) {
+          new kakao.maps.Polyline({
+            map,
+            path: positions,
+            strokeWeight: 3,
+            strokeColor: '#0e7490',
+            strokeOpacity: 0.5,
+            strokeStyle: 'dash',
+          });
+        }
+
+        map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+      } catch (e) {
+        console.error('CourseMap init error:', e);
+        setMapError(true);
+      }
+    };
+
+    if (window.kakao?.maps?.LatLng) {
+      initMap();
+    } else if (window.kakao?.maps?.load) {
+      window.kakao.maps.load(initMap);
+    } else {
+      setMapError(true);
+    }
+  }, [open, validPlaces.length]);
+
+  if (validPlaces.length === 0) return null;
+
+  return (
+    <div className="no-print" style={{marginBottom:'16px'}}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{width:'100%',padding:'12px 16px',background:'linear-gradient(135deg,#ecfdf5,#d1fae5)',border:'1px solid #6ee7b7',borderRadius: open ? '12px 12px 0 0' : '12px',cursor:'pointer',display:'flex',alignItems:'center',gap:'10px',fontSize:'14px',fontWeight:'700',color:'#065f46'}}
+      >
+        <span style={{fontSize:'20px'}}>📍</span>
+        <div style={{flex:1,textAlign:'left'}}>
+          <div>지도에서 위치 확인</div>
+          <div style={{fontSize:'12px',fontWeight:'400',color:'#047857',marginTop:'2px'}}>각 장소의 위치와 거리를 한눈에 확인할 수 있어요</div>
+        </div>
+        <span style={{fontSize:'13px',transition:'transform 0.2s',transform:open?'rotate(180deg)':'rotate(0)'}}>▼</span>
+      </button>
+      {open && (
+        <div style={{border:'1px solid #6ee7b7',borderTop:'none',borderRadius:'0 0 12px 12px',overflow:'hidden'}}>
+          {mapError ? (
+            <p style={{padding:'20px',textAlign:'center',color:'#666',fontSize:'14px'}}>지도를 불러올 수 없습니다.</p>
+          ) : (
+            <div ref={mapRef} style={{width:'100%',height:'280px'}} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Result() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -226,39 +339,84 @@ export default function Result() {
       try {
         let items = [];
         if (interests.length > 0) {
+          // ① 1차: 기본 키워드 + 확장 키워드 검색
           const searches = [];
           for (const i of interests) {
             const conf = INTEREST_CONFIG[i];
             const kw = conf?.keyword || i;
             const tid = conf?.typeId || '12';
+            // 기본 키워드
             searches.push(searchKeyword(kw, tid, region, 1, 30));
-            // 박물관은 typeId 12(관광지)에도 등록된 경우가 많으므로 추가 검색
+            // 확장 키워드
+            if (conf?.extraKeywords) {
+              for (const ek of conf.extraKeywords) {
+                searches.push(searchKeyword(ek, tid, region, 1, 20));
+              }
+            }
+            // 박물관 추가: typeId 12에도 등록된 경우
             if (i === '박물관') {
               searches.push(searchKeyword('박물관', '12', region, 1, 30));
-              searches.push(searchKeyword('역사관', '14', region, 1, 20));
-              searches.push(searchKeyword('기념관', '14', region, 1, 20));
-              searches.push(searchKeyword('전시관', '14', region, 1, 20));
+              const areaName = AREA_NAMES[region] || '';
+              if (areaName) {
+                searches.push(searchKeyword(areaName + '박물관', '14', '', 1, 20));
+                searches.push(searchKeyword(areaName + '박물관', '12', '', 1, 20));
+              }
             }
           }
-          const results = await Promise.all(searches);
+          const results = await Promise.allSettled(searches);
           const seen = new Set();
-          for (const arr of results) {
+          for (const r of results) {
+            if (r.status !== 'fulfilled') continue;
+            const arr = Array.isArray(r.value) ? r.value : [];
             for (const item of arr) {
               if (!seen.has(item.contentid)) { seen.add(item.contentid); items.push(item); }
             }
           }
         }
-        // 보충: 역사관광지(cat2=A0201)와 문화시설(type14) 추가
-        if (items.length < maxStops + 5) {
-          const [areaItems, culture] = await Promise.all([
-            areaBasedList(region, '', '12', 1, 50),
-            areaBasedList(region, '', '14', 1, 30),
-          ]);
+        // ② 보충: 정밀 cat3가 있으면 서버측 필터링, 넓은 cat3면 키워드 보충
+        if (items.length < maxStops + 5 && interests.length > 0) {
+          const cfg = INTEREST_CONFIG[interests[0]] || {};
+          const supplementSearches = [];
+          if (cfg.preciseCat3) {
+            // 정밀 cat3: areaBasedList에 cat3까지 전달
+            for (const c3 of (cfg.cat3 || [])) {
+              supplementSearches.push(
+                areaBasedList(region, '', cfg.typeId, 1, 50, { cat1: cfg.cat1, cat2: cfg.cat2, cat3: c3 })
+              );
+            }
+          } else {
+            // 넓은 cat3: 키워드 다중 검색으로 대체
+            const allKws = [cfg.keyword, ...(cfg.extraKeywords || [])];
+            const areaName = AREA_NAMES[region] || '';
+            for (const kw of allKws) {
+              supplementSearches.push(searchKeyword(kw, cfg.typeId, region, 1, 30));
+              if (areaName) {
+                supplementSearches.push(searchKeyword(areaName + kw, cfg.typeId, '', 1, 20));
+              }
+            }
+          }
+          const supplementResults = await Promise.allSettled(supplementSearches);
           const seen = new Set(items.map(i => i.contentid));
-          for (const item of [...areaItems, ...culture]) {
-            if (!seen.has(item.contentid)) { seen.add(item.contentid); items.push(item); }
+          for (const r of supplementResults) {
+            if (r.status !== 'fulfilled') continue;
+            const arr = Array.isArray(r.value) ? r.value : [];
+            for (const item of arr) {
+              if (!seen.has(item.contentid)) { seen.add(item.contentid); items.push(item); }
+            }
           }
         }
+        // ③ title 기반 후필터링: 보충검색 결과에서 관심사와 무관한 장소 제거
+        const activeInterest = interests[0] || '';
+        if (activeInterest && INTEREST_CONFIG[activeInterest]?.matchKeywords) {
+          items = items.filter(item => matchesInterest(item, activeInterest));
+        }
+        // IMAGE_OVERRIDES 적용 (부적절한 대표이미지 교체)
+        items = items.map(i => {
+          if (IMAGE_OVERRIDES[String(i.contentid)]) {
+            return { ...i, firstimage: IMAGE_OVERRIDES[String(i.contentid)] };
+          }
+          return i;
+        });
         items = items.filter(i => i.firstimage && i.mapx && i.mapy && isHeritageSuitable(i));
         const sorted = sortByRoute(items);
         setAllPlaces(sorted);
@@ -345,8 +503,29 @@ export default function Result() {
 
   if (error) return <div className="error">{error}</div>;
 
+  // ⑤ 결과 부족 시 안내
+  if (!loading && allPlaces.length === 0) {
+    return (
+      <div className="result" translate="no">
+        <button className="btn-back" onClick={() => navigate(-1)}>← 다시 설정</button>
+        <div style={{textAlign:'center',padding:'60px 20px'}}>
+          <div style={{fontSize:'48px',marginBottom:'16px'}}>🏛️</div>
+          <h2 style={{fontSize:'20px',marginBottom:'12px'}}>검색 결과가 없습니다</h2>
+          <p style={{fontSize:'15px',color:'#666',lineHeight:'1.6'}}>
+            <strong>{AREA_NAMES[region]}</strong> 지역에 <strong>{interests.join(', ')}</strong> 관련 장소가 등록되어 있지 않습니다.
+          </p>
+          <p style={{fontSize:'14px',color:'#888',marginTop:'8px'}}>다른 지역이나 관심 분야를 선택해보세요.</p>
+          <button onClick={() => navigate(-1)} style={{marginTop:'24px',padding:'12px 32px',background:'#3498db',color:'white',border:'none',borderRadius:'8px',fontSize:'15px',cursor:'pointer'}}>
+            다시 설정하기
+          </button>
+        </div>
+        <p className="source-credit">출처: ⓒ한국관광공사</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="result" id="printable-result">
+    <div className="result" id="printable-result" translate="no">
       <button className="btn-back" onClick={() => navigate(-1)}>← 다시 설정</button>
 
       <h2>{courseType === 'full' ? '하루' : '반나절'} 역사여행 코스</h2>
@@ -355,15 +534,35 @@ export default function Result() {
         {interests.length > 0 && ` · ${interests.join(', ')}`}
       </p>
 
+      {/* 오버투어리즘 분산 — 한적한 명소 배너 */}
+      {course.length > 0 && (
+        <div style={{background:'linear-gradient(135deg,#ecfdf5,#f0fdfa)',border:'1px solid #99f6e4',borderRadius:'14px',padding:'12px 16px',marginBottom:'14px',display:'flex',alignItems:'flex-start',gap:'10px'}}>
+          <span style={{fontSize:'22px',flexShrink:0,marginTop:'1px'}}>🌿</span>
+          <div>
+            <div style={{fontWeight:'700',fontSize:'14px',color:'#065f46',marginBottom:'4px'}}>
+              이 코스는 유명 관광지 대신, 한적한 역사 명소 위주로 구성되었습니다
+            </div>
+            <div style={{fontSize:'12px',color:'#047857',lineHeight:'1.5'}}>
+              한국관광공사 데이터 기반으로 관광지 쏠림이 적은 {AREA_NAMES[region]} 지역의 숨은 역사·문화 유적을 선별했습니다. 아이와 여유롭게 둘러보세요.
+            </div>
+            <div style={{display:'flex',gap:'6px',marginTop:'8px',flexWrap:'wrap'}}>
+              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>오버투어리즘 분산</span>
+              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>숨은 명소</span>
+              <span style={{background:'#d1fae5',color:'#065f46',fontSize:'11px',padding:'3px 10px',borderRadius:'20px',fontWeight:'600',border:'1px solid #a7f3d0'}}>아이 동반 적합</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 편집 안내 배너 */}
       {course.length > 0 && unselected.length > 0 && !editMode && (
         <div className="edit-banner no-print" onClick={() => setEditMode(true)} style={{background:'linear-gradient(135deg,#e8f4fd,#f0e6ff)',padding:'12px 16px',borderRadius:'10px',marginBottom:'16px',cursor:'pointer',border:'1px solid #d0d7de',display:'flex',alignItems:'center',gap:'10px'}}>
           <span style={{fontSize:'22px'}}>✏️</span>
           <div>
-            <strong style={{fontSize:'14px'}}>코스를 직접 편집할 수 있어요!</strong>
-            <p style={{fontSize:'13px',color:'#555',margin:'2px 0 0'}}>아래 {unselected.length}개 추가 장소에서 선택하고, 방문 순서도 자유롭게 바꿔보세요.</p>
+            <strong style={{fontSize:'14px'}}>마음에 안 드는 장소가 있나요?</strong>
+            <p style={{fontSize:'13px',color:'#555',margin:'2px 0 0'}}>장소 추가·제거, 방문 순서 변경이 가능해요. ({unselected.length}개 추가 장소 대기 중)</p>
           </div>
-          <span style={{marginLeft:'auto',color:'#3498db',fontWeight:'bold',fontSize:'14px',whiteSpace:'nowrap'}}>편집하기 →</span>
+          <span style={{marginLeft:'auto',color:'#0e7490',fontWeight:'bold',fontSize:'14px',whiteSpace:'nowrap'}}>수정하기 →</span>
         </div>
       )}
 
@@ -396,28 +595,67 @@ export default function Result() {
         </div>
       </div>
 
-      <div className="result-tip">
-        <span className="tip-icon">💡</span>
-        <span>{ageConf.tip}</span>
+      {/* 나이별 팁 — 강조 배너 */}
+      <div style={{background:'#fffbeb',border:'1px solid #fbbf24',borderRadius:'14px',padding:'10px 14px',marginBottom:'12px',display:'flex',alignItems:'flex-start',gap:'8px'}}>
+        <span style={{fontSize:'18px',flexShrink:0,marginTop:'1px'}}>💡</span>
+        <span style={{fontSize:'13px',color:'#92400e',lineHeight:'1.5',fontWeight:'500'}}>{ageConf.tip}</span>
       </div>
 
-      {/* 코스 저장 + 편집 + 인쇄 */}
-      <div className="result-actions">
-        <button className={`btn-save ${saved ? 'saved' : ''}`} onClick={handleSaveCourse} disabled={saved || course.length === 0}>
-          {saved ? "✅ 저장됨" : "💾 이 코스 저장하기"}
+      {/* 액션 버튼 바 */}
+      <div style={{display:'flex',gap:'8px',marginBottom:'14px'}}>
+        <button className={`btn-save ${saved ? 'saved' : ''}`} onClick={handleSaveCourse} disabled={saved || course.length === 0} style={{flex:1,padding:'12px',borderRadius:'10px',border:'none',fontWeight:'700',fontSize:'14px',cursor:'pointer',background: saved ? '#d1fae5' : 'linear-gradient(135deg,#0e7490,#0891b2)',color: saved ? '#065f46' : '#fff',boxShadow: saved ? 'none' : '0 2px 8px rgba(14,116,144,0.3)',transition:'all 0.2s'}}>
+          {saved ? "✅ 저장됨" : "💾 코스 저장"}
         </button>
-        <button className="btn-edit no-print" onClick={() => setEditMode(!editMode)} style={{background: editMode ? '#e74c3c' : '#3498db', color:'#fff', border:'none', padding:'10px 18px', borderRadius:'8px', cursor:'pointer', fontWeight:'bold'}}>
-          {editMode ? "✏️ 편집 완료" : "✏️ 코스 편집"}
+        <button className="no-print" onClick={() => setEditMode(!editMode)} style={{padding:'12px 16px',borderRadius:'10px',border: editMode ? '2px solid #e74c3c' : '2px solid #3498db',background: editMode ? '#fef2f2' : '#eff6ff',color: editMode ? '#dc2626' : '#2563eb',fontWeight:'700',fontSize:'14px',cursor:'pointer',transition:'all 0.2s'}}>
+          {editMode ? "✏️ 완료" : "✏️ 편집"}
         </button>
-        <button className="btn-print no-print" onClick={() => window.print()}>🖨️ 인쇄</button>
+        <button className="no-print" onClick={() => window.print()} style={{padding:'12px 16px',borderRadius:'10px',border:'2px solid #e2e8f0',background:'#f8fafc',color:'#475569',fontWeight:'700',fontSize:'14px',cursor:'pointer'}}>
+          🖨️
+        </button>
       </div>
-      <p className="save-guide no-print">💡 저장된 코스는 상단 <strong>📋 저장코스</strong>에서 다시 볼 수 있어요 (이 브라우저에 최대 10개 보관). 인쇄 버튼을 누르면 코스 전체를 PDF로 저장하거나 출력할 수 있습니다.</p>
+
+      {/* 이용 팁 — 통합 패널 (기본 닫힘) */}
+      <div className="no-print" style={{background:'#f8fafc',border:'1px solid #cbd5e1',borderRadius:'14px',marginBottom:'14px',overflow:'hidden'}}>
+        <button onClick={(e) => { const panel = e.currentTarget.nextElementSibling; panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; e.currentTarget.querySelector('.arr').style.transform = panel.style.display === 'none' ? 'rotate(0)' : 'rotate(180deg)'; }} style={{width:'100%',padding:'13px 16px',background:'none',border:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:'8px',fontSize:'14px',fontWeight:'700',color:'#334155',textAlign:'left'}}>
+          <span style={{fontSize:'16px'}}>📋</span>
+          <span style={{flex:1}}>이용 팁 — 저장·편집·상세보기</span>
+          <span className="arr" style={{fontSize:'11px',color:'#94a3b8',transition:'transform 0.2s'}}>▼</span>
+        </button>
+        <div style={{display:'none',padding:'0 16px 14px'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+            <div style={{display:'flex',gap:'10px',alignItems:'flex-start'}}>
+              <span style={{width:'26px',height:'26px',borderRadius:'50%',background:'#0e7490',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',flexShrink:0,fontWeight:'700'}}>1</span>
+              <p style={{fontSize:'13px',color:'#334155',lineHeight:'1.6',margin:0}}>각 장소를 <strong>터치</strong>하면 역사 이야기, 퀴즈, 카카오맵 길찾기를 볼 수 있어요.</p>
+            </div>
+            <div style={{display:'flex',gap:'10px',alignItems:'flex-start'}}>
+              <span style={{width:'26px',height:'26px',borderRadius:'50%',background:'#0e7490',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',flexShrink:0,fontWeight:'700'}}>2</span>
+              <p style={{fontSize:'13px',color:'#334155',lineHeight:'1.6',margin:0}}><strong>편집</strong> 버튼으로 순서 변경·제거, 아래 <strong>'추가 가능한 장소'</strong>에서 <strong>+</strong>로 추가할 수 있어요.</p>
+            </div>
+            <div style={{display:'flex',gap:'10px',alignItems:'flex-start'}}>
+              <span style={{width:'26px',height:'26px',borderRadius:'50%',background:'#0e7490',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',flexShrink:0,fontWeight:'700'}}>3</span>
+              <p style={{fontSize:'13px',color:'#334155',lineHeight:'1.6',margin:0}}>저장된 코스는 상단 <strong>📋 저장코스</strong>에서 다시 확인 (최대 10개).</p>
+            </div>
+            <div style={{display:'flex',gap:'10px',alignItems:'flex-start'}}>
+              <span style={{width:'26px',height:'26px',borderRadius:'50%',background:'#0e7490',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'13px',flexShrink:0,fontWeight:'700'}}>4</span>
+              <p style={{fontSize:'13px',color:'#334155',lineHeight:'1.6',margin:0}}><strong>🖨️ 인쇄</strong>로 코스 전체를 PDF 저장·출력할 수 있습니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {editMode && (
-        <p className="edit-guide no-print" style={{background:'#fff3cd',padding:'10px 14px',borderRadius:'8px',fontSize:'14px',marginBottom:'12px'}}>
-          ✏️ <strong>편집 모드</strong>: ▲▼로 순서 변경, ✕로 코스에서 제거. 아래 '추가 가능한 장소'에서 + 를 눌러 코스에 추가할 수 있습니다.
-        </p>
+        <div className="no-print" style={{background:'linear-gradient(135deg,#ecfdf5,#f0fdfa)',border:'2px solid #14b8a6',padding:'14px 16px',borderRadius:'14px',fontSize:'14px',marginBottom:'14px',lineHeight:'1.6',color:'#0f766e'}}>
+          <div style={{fontWeight:'800',fontSize:'15px',marginBottom:'6px'}}>✏️ 마음에 안 드는 장소가 있나요?</div>
+          <div style={{fontSize:'13px',color:'#115e59'}}>
+            각 장소의 <span style={{display:'inline-block',background:'#ef4444',color:'#fff',borderRadius:'4px',padding:'1px 6px',fontSize:'12px',fontWeight:'700'}}>X</span>로 제거하고,
+            <span style={{display:'inline-block',background:'#0e7490',color:'#fff',borderRadius:'4px',padding:'1px 6px',fontSize:'12px',fontWeight:'700'}}>위</span>
+            <span style={{display:'inline-block',background:'#0e7490',color:'#fff',borderRadius:'4px',padding:'1px 6px',fontSize:'12px',fontWeight:'700'}}>아래</span>로 순서를 바꿔보세요.
+            아래 <strong>'추가 가능한 장소'</strong>에서 <span style={{display:'inline-block',background:'#059669',color:'#fff',borderRadius:'4px',padding:'1px 6px',fontSize:'12px',fontWeight:'700'}}>+</span>를 눌러 새 장소도 넣을 수 있어요.
+          </div>
+        </div>
       )}
+
+      <CourseMap places={course} />
 
       {course.length === 0 ? (
         <p className="no-result">조건에 맞는 관광지를 찾지 못했습니다. 다른 지역이나 관심분야를 선택해보세요.</p>
@@ -436,18 +674,23 @@ export default function Result() {
               )}
               <div style={{position:'relative'}}>
                 {editMode && (
-                  <div className="edit-controls no-print" style={{position:'absolute',right:'8px',top:'8px',zIndex:2,display:'flex',gap:'4px'}}>
-                    <button onClick={() => moveUp(idx)} disabled={idx===0} style={{width:'30px',height:'30px',border:'1px solid #ccc',borderRadius:'6px',background:'#fff',cursor:'pointer',fontSize:'14px'}} title="위로">▲</button>
-                    <button onClick={() => moveDown(idx)} disabled={idx===course.length-1} style={{width:'30px',height:'30px',border:'1px solid #ccc',borderRadius:'6px',background:'#fff',cursor:'pointer',fontSize:'14px'}} title="아래로">▼</button>
-                    <button onClick={() => togglePlace(place)} style={{width:'30px',height:'30px',border:'1px solid #e74c3c',borderRadius:'6px',background:'#fff',color:'#e74c3c',cursor:'pointer',fontSize:'14px',fontWeight:'bold'}} title="제거">✕</button>
+                  <div className="edit-controls no-print" style={{position:'absolute',right:'8px',top:'8px',zIndex:10,display:'flex',gap:'4px'}}
+                    onClick={(e) => e.preventDefault()}>
+                    <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveUp(idx); }} disabled={idx===0} style={{width:'36px',height:'36px',border:'none',borderRadius:'8px',background:'#0e7490',cursor:'pointer',fontSize:'13px',fontWeight:'bold',lineHeight:'1',color:'#fff',opacity:idx===0?0.4:1,boxShadow:'0 1px 4px rgba(0,0,0,0.15)'}} title="위로">위</button>
+                    <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); moveDown(idx); }} disabled={idx===course.length-1} style={{width:'36px',height:'36px',border:'none',borderRadius:'8px',background:'#0e7490',cursor:'pointer',fontSize:'13px',fontWeight:'bold',lineHeight:'1',color:'#fff',opacity:idx===course.length-1?0.4:1,boxShadow:'0 1px 4px rgba(0,0,0,0.15)'}} title="아래로">아래</button>
+                    <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); togglePlace(place); }} style={{width:'36px',height:'36px',border:'none',borderRadius:'8px',background:'#ef4444',color:'#fff',cursor:'pointer',fontSize:'16px',fontWeight:'bold',lineHeight:'1',boxShadow:'0 1px 4px rgba(0,0,0,0.15)'}} title="제거">X</button>
                   </div>
                 )}
-                <Link to={editMode ? '#' : `/detail/${place.contentid}?typeId=${place.contenttypeid}&childAge=${childAge}`} className="stop-card" onClick={editMode ? (e) => e.preventDefault() : undefined}>
+                <Link to={`/detail/${place.contentid}?typeId=${place.contenttypeid}&childAge=${childAge}`} className="stop-card">
                   <div className="stop-number">{idx + 1}</div>
                   {place.firstimage && <img src={place.firstimage} alt={place.title} className="stop-img" loading="lazy" />}
                   <div className="stop-info">
                     <h3>{place.title}</h3>
                     <p className="stop-addr">{place.addr1}</p>
+                    <div style={{display:'flex',gap:'4px',flexWrap:'wrap',margin:'4px 0'}}>
+                      <span style={{background:'#ecfdf5',color:'#065f46',fontSize:'11px',padding:'2px 8px',borderRadius:'12px',border:'1px solid #a7f3d0',fontWeight:'600'}}>숨은 명소</span>
+                      {CURRICULUM_MAP[interests[0]] && <span style={{background:'#fef3c7',color:'#92400e',fontSize:'11px',padding:'2px 8px',borderRadius:'12px',border:'1px solid #fde68a',fontWeight:'600'}}>교과 연계</span>}
+                    </div>
                     <p className="stop-time">⏱ 추천 체류 {childAge === 'baby' ? '20분' : '30~40분'}</p>
                   </div>
                 </Link>
