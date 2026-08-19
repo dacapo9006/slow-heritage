@@ -25,6 +25,9 @@ export const STRINGS = {
   featureHiddenDesc: { ko: '인기 관광지 대신 주변 숨은 역사 명소 추천', en: 'Quiet historic sites instead of crowded hotspots' },
   featureSlowTitle: { ko: '슬로 워킹', en: 'Slow Walking' },
   featureSlowDesc: { ko: '평탄한 경로, 쉼터·화장실 포함 느린 산책 코스', en: 'Flat, relaxed routes with rest stops and restrooms' },
+  guideTag1: { ko: '지역 선택', en: 'Pick a Region' },
+  guideTag2: { ko: '코스 편집', en: 'Edit Trip' },
+  guideTag3: { ko: '저장·출력', en: 'Save & Print' },
 
   // Planner
   plannerTitle: { ko: '여행 계획 세우기', en: 'Plan Your Trip' },
