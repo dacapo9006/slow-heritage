@@ -547,21 +547,25 @@ export default function Result() {
 
   // ⑤ 결과 부족 시 안내
   if (!loading && allPlaces.length === 0) {
+    const noResAreaLabel = lang === 'en' ? (AREA_NAMES_EN[region] || AREA_NAMES[region]) : AREA_NAMES[region];
+    const noResInterestLabels = interests.map(i => lang === 'en' ? (INTEREST_EN[i] || i) : i);
     return (
       <div className="result" translate="no">
-        <button className="btn-back" onClick={() => navigate(-1)}>← 다시 설정</button>
+        <button className="btn-back" onClick={() => navigate(-1)}>{t('backToSetup')}</button>
         <div style={{textAlign:'center',padding:'60px 20px'}}>
           <div style={{fontSize:'48px',marginBottom:'16px'}}>🏛️</div>
-          <h2 style={{fontSize:'20px',marginBottom:'12px'}}>검색 결과가 없습니다</h2>
+          <h2 style={{fontSize:'20px',marginBottom:'12px'}}>{t('noResultsTitle')}</h2>
           <p style={{fontSize:'15px',color:'#666',lineHeight:'1.6'}}>
-            <strong>{AREA_NAMES[region]}</strong> 지역에 <strong>{interests.join(', ')}</strong> 관련 장소가 등록되어 있지 않습니다.
+            {lang === 'en'
+              ? <><strong>{noResInterestLabels.join(', ')}</strong> places are not yet listed in <strong>{noResAreaLabel}</strong>.</>
+              : <><strong>{noResAreaLabel}</strong> 지역에 <strong>{noResInterestLabels.join(', ')}</strong> 관련 장소가 등록되어 있지 않습니다.</>}
           </p>
-          <p style={{fontSize:'14px',color:'#888',marginTop:'8px'}}>다른 지역이나 관심 분야를 선택해보세요.</p>
+          <p style={{fontSize:'14px',color:'#888',marginTop:'8px'}}>{t('noResultsHint')}</p>
           <button onClick={() => navigate(-1)} style={{marginTop:'24px',padding:'12px 32px',background:'#3498db',color:'white',border:'none',borderRadius:'8px',fontSize:'15px',cursor:'pointer'}}>
-            다시 설정하기
+            {t('resetBtn')}
           </button>
         </div>
-        <p className="source-credit">출처: ⓒ한국관광공사</p>
+        <p className="source-credit">{t('dataSource')}</p>
       </div>
     );
   }
@@ -712,7 +716,7 @@ export default function Result() {
       <CourseMap places={course} />
 
       {course.length === 0 ? (
-        <p className="no-result">조건에 맞는 관광지를 찾지 못했습니다. 다른 지역이나 관심분야를 선택해보세요.</p>
+        <p className="no-result">{t('noResultsNotFound')}</p>
       ) : (
         <div className="course-timeline">
           {course.map((place, idx) => (
